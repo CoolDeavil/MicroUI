@@ -1,53 +1,71 @@
-
-export default class SkeletonUI {
+interface IParallaxElement extends HTMLInputElement {
+    speed: string;
+}
+export default class MicroUI {
     private appHero: HTMLElement;
     private appNav: HTMLElement;
     private sideNav: HTMLElement;
     private fab: HTMLElement;
-    private toggle: HTMLElement;
+    private readonly toggle: HTMLElement;
     private formSwitch: HTMLFormElement;
     private appContent: HTMLElement;
     private languageValue: HTMLInputElement;
     public langSwitch: NodeListOf<HTMLElement>;
-    public heroParallaxList: NodeListOf<HTMLElement>;
     private windowMediaQuery: string;
     public stickyActive: boolean;
     private windowY: number;
     private windowX: number;
     private heroHeight: number;
     public parallax: Boolean;
-    public parallaxElementList: any[];
-
-    constructor(parallaxElements: any) {
+    public parallaxElements: IParallaxElement[];
+    private readonly callParallax: any;
+    constructor(parallaxElements: [], callBack:any = null) {
         this.appHero = document.querySelector(".appHero");
         this.appContent = document.querySelector(".appContent");
         this.appNav = document.querySelector(".appNavigation");
         this.sideNav = document.querySelector(".appSideNavOverlay");
         this.fab = document.querySelector(".cFab");
-        this.toggle = document.querySelector(".js_hamburger");        // TODO write functionality
+
         this.langSwitch = document.querySelectorAll(".language");
         this.formSwitch = document.querySelector("#formSwitch");
         this.languageValue = document.querySelector('input[name="language"]');
-        this.parallaxElementList = parallaxElements;
+        // this.parallaxElementList = parallaxElements;
         this.stickyActive = true;
         this.parallax = true;
 
-        if (!this.checkParallaxParams()){
+        if (!this.checkParallaxParams(parallaxElements)){
             this.parallax = false;
             console.log("[#] " , this.parallax)
         }
 
+        if(this.parallax){
+            if(callBack){
+                this.callParallax = callBack;
+            }else{
+                this.callParallax = this.setTranslateFactor;
+            }
+
+        }
+        if(document.querySelector(".appSideNavOverlay")){
+            this.toggle = document.querySelector(".js_hamburger");
+        }
         this.setEventHandlers();
         console.log('SkeletonUI V0.0.2')
     }
-    checkParallaxParams(){
-        this.heroParallaxList = this.appHero.querySelectorAll('.parallax');
-        if(this.parallaxElementList.length !== this.heroParallaxList.length){
-            this.parallax = false;
-            return this.parallax
+    checkParallaxParams(config: any[]){
+        this.parallaxElements =  Array.prototype.slice.call(this.appHero.querySelectorAll('.parallax'), 0);
+        if(this.parallaxElements.length !== config.length){
+            console.log("Parallax Config is invalid...");
+            return false;
         }
+        config.forEach((entry:any,i)=>{
+            let pe = this.parallaxElements.find((el:any)=>{
+                return el.classList.contains(entry.target);
+            });
+            pe.speed = config[i].speed
+        })
         return true;
-    } 
+    }
     setEventHandlers() : void {
         window.addEventListener('scroll',this.onWindowScroll.bind(this),false);
         window.addEventListener('resize',this.onWindowResize.bind(this),false);
@@ -63,20 +81,35 @@ export default class SkeletonUI {
                 this.fab.classList.remove('pressed');
             }, 500);
         }
-        this.toggle.onclick = ()=>{
-            console.log("Toggle Side Navigation");
-            this.sideNav.classList.toggle('isShow');
-            this.sideNav.querySelector('.appSideNav').classList.toggle('showNavAnim');
-            // TODO Add transition end to close panel
-        };
+        if(this.toggle){
+            this.toggle.onclick = ()=>{
+                this.sideNav.classList.toggle('isShow');
+                this.sideNav.querySelector('.appSideNav').classList.toggle('showNavAnim');
+            };
+
+        }
         [].forEach.call(this.langSwitch, (l:HTMLElement)=>{
             l.onclick = (e:MouseEvent)=>{
                 e.preventDefault();
-                // @ts-ignore
-                this.languageValue.value = e.target.classList[1].replace(/ /g,'');
+                this.languageValue.value = (e.target as HTMLElement).classList[1].replace(/ /g,'');
                 this.formSwitch.submit();
             }
-        })
+        });
+
+        let dropdown = document.getElementsByClassName("dropdown-btn");
+        let i;
+        for (i = 0; i < dropdown.length; i++) {
+            dropdown[i].addEventListener("click", function() {
+                this.classList.toggle("active");
+                let dropdownContent = this.nextElementSibling;
+                if (dropdownContent.style.display === "block") {
+                    dropdownContent.style.display = "none";
+                } else {
+                    dropdownContent.style.display = "block";
+                }
+            });
+        }
+
     }
     onWindowScroll() : void {
         this.windowY = Math.round( window.pageYOffset
@@ -88,7 +121,7 @@ export default class SkeletonUI {
     onWindowResize() : void {
         this.windowY = Math.round(window.pageYOffset);
         this.windowX = Math.round(window.pageXOffset);
-        this.windowMediaQuery = SkeletonUI.getCurrentMQuery();
+        this.windowMediaQuery = MicroUI.getCurrentMQuery();
         this.handleUIResize();
     }
     handleUIScroll(curX: number, curY: number) {
@@ -105,13 +138,17 @@ export default class SkeletonUI {
             }
         }
         if(this.parallax){
+            let xScrollPosition = window.pageXOffset;
+            let yScrollPosition = window.pageYOffset;
             if(!this.appNav.classList.contains("isSticky") && this.parallax === true ){
-                [].forEach.call(this.parallaxElementList, (p: { target: string; speed: number; }): void =>{
-                    let pElement: HTMLElement = this.appHero.querySelector("." + p.target);
-                    pElement.style.transform = "translate3D("+(this.windowX)+"px, "+eval(this.windowY.toString()+p.speed)+"px, 0)"
+                this.parallaxElements.forEach((pe:any)=>{
+                    this.callParallax(pe,this.windowX,this.windowY,yScrollPosition,pe.speed);
                 })
             }
         }
+    }
+    setTranslateFactor(el:any,xPos:any,yPos:any,yScrollPosition:any,speed:any){
+        el.style.transform = "translate3D("+(xPos)+"px, "+eval(yPos.toString()+speed)+"px, 0)"
     }
     handleUIResize() : void  {
         if(!this.stickyActive){ return }
@@ -121,6 +158,11 @@ export default class SkeletonUI {
             this.appContent.classList.add('isSticky');
         } else {
             this.handleUIScroll(this.windowX, this.windowY);
+
+            if(this.toggle){
+                this.sideNav.classList.remove('isShow');
+                this.sideNav.querySelector('.appSideNav').classList.remove('showNavAnim');
+            }
         }
     }
     static getCurrentMQuery() : string {
