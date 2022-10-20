@@ -1,9 +1,10 @@
 exports.baseCode = () => {
     return {
-        main: [
+        main :[
             './assets/ts/main',
             './assets/scss/main',
-            './assets/scss/skeleton',
+            './assets/scss/micro',
         ],
+
     }
 };
